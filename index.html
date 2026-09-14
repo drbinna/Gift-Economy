@@ -160,6 +160,36 @@ input[type=range]{width:100%;accent-color:var(--chalk)}
 .chart .b{height:13px;background:var(--chalk);border-radius:2px;min-width:1px;opacity:.85}
 .chart .c{color:var(--dim);font-variant-numeric:tabular-nums;font-size:11px}
 .hidden{display:none}
+
+/* ---------- welcome ---------- */
+.welcome{min-height:74vh;display:flex;align-items:center;justify-content:center}
+.hero{max-width:540px;width:100%}
+.wordmark{font-size:clamp(34px,7.5vw,54px);font-weight:800;letter-spacing:-.035em;
+  line-height:1.03;text-align:center}
+.tag{color:var(--dim);font-size:15px;margin-top:11px;text-align:center}
+.boot{margin-top:38px}
+.bootbar{height:3px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;
+  max-width:210px;margin:0 auto}
+.bootbar span{display:block;height:100%;width:0;background:var(--chalk);border-radius:2px;
+  transition:width .35s ease}
+.bootmsg{font-size:12.5px;color:var(--dim);margin-top:12px;text-align:center}
+.wbody{margin-top:32px}
+.wlede{color:var(--dim);font-size:14px;margin:0 0 20px;text-align:center}
+.wsteps{list-style:none;margin:0 0 20px;padding:0;display:flex;flex-direction:column;gap:13px}
+.wsteps li{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.5}
+.wn{width:21px;height:21px;border-radius:50%;background:rgba(255,255,255,.14);flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;
+  margin-top:1px}
+.wcatch{font-size:13.5px;color:var(--dim);border-left:2px solid rgba(255,255,255,.28);
+  padding-left:12px;margin:0 0 24px}
+.wgo{text-align:center}
+
+/* ---------- sound toggle ---------- */
+.snd{background:none;border:1px solid rgba(255,255,255,.18);border-radius:99px;
+  width:31px;height:29px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--dim);padding:0;flex:none}
+.snd[aria-pressed=true]{color:var(--chalk);border-color:rgba(255,255,255,.4)}
+.snd svg{width:15px;height:15px}
 .note{font-size:12.5px;color:var(--dim);margin-top:20px;max-width:62ch}
 @media (max-width:620px){.card{width:52px;height:73px;font-size:28px}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
@@ -172,11 +202,40 @@ input[type=range]{width:100%;accent-color:var(--chalk)}
     <div class="tabs" role="tablist">
       <button class="tab" id="tPlay" role="tab" aria-selected="true">Play</button>
       <button class="tab" id="tBal" role="tab" aria-selected="false">Balance</button>
+      <button class="snd" id="sndBtn" aria-pressed="true" aria-label="Toggle sound" title="Sound"></button>
     </div>
   </div>
 
+  <!-- ======== WELCOME ======== -->
+  <section id="welcome" class="welcome">
+    <div class="hero">
+      <div class="wordmark">Welcome to<br>The Gift Economy</div>
+      <div class="tag">A bidding game where winning arms the player next to you.</div>
+
+      <div class="boot" id="boot">
+        <div class="bootbar"><span id="bootFill"></span></div>
+        <div class="bootmsg" id="bootMsg">Shuffling the prize deck</div>
+      </div>
+
+      <div class="wbody hidden" id="welcomeBody">
+        <p class="wlede">Everyone holds cards numbered 1 to 7. Nine prizes come out one at a time.</p>
+        <ol class="wsteps">
+          <li><span class="wn">1</span><div><b>Bid.</b> A prize flips over. Everyone secretly
+            plays one card face down, then all reveal at once.</div></li>
+          <li><span class="wn">2</span><div><b>Cancel.</b> Any number played by more than one
+            person is crossed out. The highest number still standing takes the prize.</div></li>
+          <li><span class="wn">3</span><div><b>Give.</b> The card you played is not discarded.
+            It goes to the player on your left and joins their hand.</div></li>
+        </ol>
+        <p class="wcatch">So winning costs you your best card and hands it straight to a rival.
+          And playing a 1 loses the round on purpose, but clogs their hand with junk.</p>
+        <div class="wgo"><button class="btn" id="enter">Set up the table</button></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ======== LOBBY ======== -->
-  <section id="lobby" class="lobby">
+  <section id="lobby" class="lobby hidden">
     <h2>Set up the table</h2>
     <p class="lede">Name everyone playing and leave the rest as bots. One device gets
       passed around, so each person only ever sees their own hand.</p>
@@ -271,6 +330,108 @@ input[type=range]{width:100%;accent-color:var(--chalk)}
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
+
+/* ================= sound =================
+   Everything is synthesised with the Web Audio API, so the page stays a single
+   self-contained file with nothing to download. Context is created on the first
+   user gesture because browsers block audio before that. */
+const Sound=(()=>{
+  let ctx=null, master=null, on=true;
+
+  function init(){
+    if(ctx) return;
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return;
+    ctx=new AC();
+    master=ctx.createGain();
+    master.gain.value=0.20;
+    master.connect(ctx.destination);
+  }
+  const live=()=>on&&ctx&&ctx.state!=='suspended';
+
+  // one shaped oscillator
+  function tone(freq,at,dur,type,peak,detune){
+    if(!ctx) return;
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    if(detune) o.detune.value=detune;
+    const t=ctx.currentTime+at;
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(peak,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t+dur+0.02);
+  }
+
+  // filtered noise burst, used for card handling
+  function noise(at,dur,peak,f0,f1,q){
+    if(!ctx) return;
+    const n=Math.floor(ctx.sampleRate*dur);
+    const buf=ctx.createBuffer(1,n,ctx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const flt=ctx.createBiquadFilter(); flt.type='bandpass';
+    flt.Q.value=q||1.2;
+    const g=ctx.createGain();
+    const t=ctx.currentTime+at;
+    flt.frequency.setValueAtTime(f0,t);
+    flt.frequency.exponentialRampToValueAtTime(f1||f0,t+dur);
+    g.gain.setValueAtTime(peak,t);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.connect(flt); flt.connect(g); g.connect(master);
+    src.start(t); src.stop(t+dur+0.02);
+  }
+
+  return {
+    init,
+    isOn:()=>on,
+    toggle(){ on=!on; if(on){ init(); ping(); } return on; },
+    unlock(){ init(); if(ctx&&ctx.state==='suspended') ctx.resume(); },
+
+    // a card being put down on the table
+    place(){ if(!live())return; noise(0,0.055,0.32,900,260,1.1); tone(150,0,0.07,'sine',0.16); },
+    // all bids turning over together
+    flip(){ if(!live())return;
+      for(let i=0;i<3;i++) noise(i*0.045,0.05,0.2,1200,320,1.0); },
+    // matching numbers striking each other out
+    clash(){ if(!live())return;
+      tone(128,0,0.2,'square',0.1); tone(136,0,0.2,'square',0.09,8); },
+    // prize claimed; brighter and fuller for a bigger prize
+    win(value,max){ if(!live())return;
+      const r=Math.max(0,Math.min(1,(value-1)/Math.max(1,max-1)));
+      const base=392*Math.pow(2,r*0.58);                 // G4 up toward D5
+      tone(base,0,0.5,'sine',0.17);
+      tone(base*1.25,0.055,0.45,'sine',0.12);            // major third
+      tone(base*1.5,0.11,0.42,'sine',0.10);              // fifth
+      if(r>0.6) tone(base*2,0.16,0.36,'sine',0.07);      // octave on the big ones
+    },
+    // nobody took it
+    dud(){ if(!live())return; tone(196,0,0.26,'triangle',0.1);
+      tone(185,0.07,0.24,'triangle',0.08); },
+    // cards travelling round the table
+    pass(){ if(!live())return; noise(0,0.28,0.17,380,1500,0.7); },
+    // hand the device to the next person
+    ping(){ if(!live())return; tone(587,0,0.15,'sine',0.13); tone(880,0.08,0.16,'sine',0.10); },
+    // end of game
+    fanfare(){ if(!live())return;
+      [392,494,587,784].forEach((f,i)=>tone(f,i*0.11,0.5,'sine',0.14-i*0.012)); }
+  };
+})();
+
+const SPK_ON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+  +'stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/>'
+  +'<path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+const SPK_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+  +'stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/>'
+  +'<path d="m23 9-6 6"/><path d="m17 9 6 6"/></svg>';
+
+function paintSnd(){
+  const b=$('sndBtn');
+  b.innerHTML=Sound.isOn()?SPK_ON:SPK_OFF;
+  b.setAttribute('aria-pressed',Sound.isOn());
+  b.title=Sound.isOn()?'Sound on':'Sound off';
+}
+$('sndBtn').onclick=()=>{ Sound.toggle(); paintSnd(); };
 
 /* ================= config ================= */
 const CFG={hand:7,rounds:9};
@@ -446,7 +607,7 @@ const humanSeats=()=>S.seats.map((s,i)=>s.human?i:-1).filter(i=>i>=0);
 function beginRound(){
   S.seats.forEach(s=>{s.played=null;s.cancelled=false;s.won=false;});
   const hs=humanSeats();
-  if(hs.length>1){S.phase='handoff';S.active=hs[0];render();}
+  if(hs.length>1){S.phase='handoff';S.active=hs[0];render();Sound.ping();}
   else if(hs.length===1){S.phase='bid';S.active=hs[0];render();}
   else {S.phase='bid';S.active=-1;botsAndReveal();}
 }
@@ -455,9 +616,10 @@ function bid(idx){
   if(S.phase!=='bid'||S.active<0)return;
   const me=S.seats[S.active];
   me.played=me.hand[idx];
+  Sound.place();
   const hs=humanSeats();
   const nxt=hs[hs.indexOf(S.active)+1];
-  if(nxt!==undefined){S.phase='handoff';S.active=nxt;render();}
+  if(nxt!==undefined){S.phase='handoff';S.active=nxt;render();Sound.ping();}
   else {S.active=-1;render();setTimeout(botsAndReveal,380);}
 }
 
@@ -486,6 +648,14 @@ function reveal(){
     : ` &middot; nobody takes it`;
   S.log.unshift({n:S.round+1,html:txt});
   render();
+
+  // the round told as three beats: cards turn, matches strike out, prize lands
+  Sound.flip();
+  const clashed=uniq.length>0;
+  if(clashed) setTimeout(()=>Sound.clash(),230);
+  setTimeout(()=>{
+    if(res.winner) Sound.win(S.prize,CFG.rounds); else Sound.dud();
+  }, clashed?500:300);
 }
 
 function nextRound(){
@@ -494,9 +664,10 @@ function nextRound(){
     const from=(i-1+S.seats.length)%S.seats.length;
     s.hand.push(gifts[from]);s.hand.sort((a,b)=>a-b);
   });
+  Sound.pass();
   S.round++;
   if(S.round<CFG.rounds){S.prize=S.deck[S.round];beginRound();}
-  else {S.phase='over';S.active=-1;render();}
+  else {S.phase='over';S.active=-1;render();setTimeout(()=>Sound.fanfare(),260);}
 }
 
 function cardHTML(v,color,letter,cls){
@@ -598,6 +769,7 @@ $('next').onclick=nextRound;
 
 /* ================= tabs ================= */
 function showTab(play){
+  $('welcome').classList.add('hidden');
   $('tPlay').setAttribute('aria-selected',play);
   $('tBal').setAttribute('aria-selected',!play);
   $('balance').classList.toggle('hidden',play);
@@ -674,5 +846,44 @@ function paint(r,cfg){
       <span class="c">${r.hist[k]}</span></div>`).join('');
 }
 
+paintSnd();
 renderLobby();
+$('tPlay').classList.add('hidden');
+$('tBal').classList.add('hidden');
+
+/* ---------- welcome / loading ----------
+   The wait is real: we hold until the webfont has actually loaded, so the
+   wordmark never reflows under the reader. The floor stops it flashing. */
+(function boot(){
+  const fill=$('bootFill'), msg=$('bootMsg');
+  const steps=[[30,'Shuffling the prize deck'],[60,'Dealing hands of 1 to 7'],[84,'Setting the type']];
+  let i=0;
+  requestAnimationFrame(()=>fill.style.width='10%');
+  const tick=setInterval(()=>{
+    if(i>=steps.length){clearInterval(tick);return;}
+    fill.style.width=steps[i][0]+'%'; msg.textContent=steps[i][1]; i++;
+  },280);
+
+  const fonts=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
+  const floor=new Promise(r=>setTimeout(r,950));
+  const ceiling=new Promise(r=>setTimeout(r,4000));   // never strand the reader
+
+  Promise.race([Promise.all([fonts,floor]),ceiling]).then(()=>{
+    clearInterval(tick);
+    fill.style.width='100%'; msg.textContent='Ready';
+    setTimeout(()=>{
+      $('boot').classList.add('hidden');
+      $('welcomeBody').classList.remove('hidden');
+    },400);
+  });
+})();
+
+$('enter').onclick=()=>{
+  Sound.unlock();          // browsers only allow audio after a real gesture
+  Sound.ping();
+  $('welcome').classList.add('hidden');
+  $('lobby').classList.remove('hidden');
+  $('tPlay').classList.remove('hidden');
+  $('tBal').classList.remove('hidden');
+};
 </script>
