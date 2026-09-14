@@ -1,0 +1,678 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Gift Economy — playtest build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --mat:#223C39; --mat2:#1B302E; --grid:rgba(255,255,255,.055);
+  --card:#FAF8F3; --ink:#16211F;
+  --chalk:#E9EFEC; --dim:#93A6A2; --prize:#0F6E4F;
+  --p0:#3A8DD6; --p1:#D14A33; --p2:#D9A02B; --p3:#9B5FC0; --p4:#4FB3A6; --p5:#C2608F;
+  --r:7px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--mat);
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px),
+    radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.06),transparent 60%);
+  background-size:28px 28px,28px 28px,100% 100%;
+  color:var(--chalk); font-family:Archivo,system-ui,sans-serif;
+  font-size:15px; line-height:1.5; min-height:100vh;
+}
+.wrap{max-width:960px;margin:0 auto;padding:18px 18px 56px}
+
+.bar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:12px;margin-bottom:20px}
+.bar h1{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:0}
+.bar .sub{color:var(--dim);font-size:13px}
+.tabs{margin-left:auto;display:flex;gap:4px}
+.tab{background:none;border:1px solid rgba(255,255,255,.18);color:var(--dim);
+  font:inherit;font-size:13px;font-weight:600;padding:5px 13px;border-radius:99px;cursor:pointer}
+.tab[aria-selected=true]{background:var(--chalk);color:var(--mat2);border-color:var(--chalk)}
+.tab:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{
+  outline:2px solid var(--chalk);outline-offset:2px}
+
+/* ---------- lobby ---------- */
+.lobby h2{font-size:17px;font-weight:700;margin:0 0 4px}
+.lobby .lede{color:var(--dim);font-size:13.5px;margin:0 0 20px;max-width:58ch}
+.count{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.count .n{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;min-width:30px;text-align:center}
+.step{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.28);
+  background:none;color:var(--chalk);font:inherit;font-size:19px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;line-height:1}
+.step:disabled{opacity:.3;cursor:default}
+.count .lbl{color:var(--dim);font-size:13px}
+.hint{font-size:12.5px;color:#F0C070;margin:0 0 20px;max-width:64ch;min-height:18px}
+.hint.quiet{color:var(--dim)}
+
+.seatrows{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+.seatrow{display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.13);
+  border-radius:var(--r);padding:9px 11px;background:rgba(0,0,0,.16);flex-wrap:wrap}
+.seatrow .tag{width:26px;height:26px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;font-weight:800;font-size:12px;color:#fff;flex:none}
+.seatrow input[type=text]{flex:1;min-width:120px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.14);border-radius:5px;color:var(--chalk);
+  font:inherit;font-size:14px;padding:6px 9px}
+.toggle{display:flex;border:1px solid rgba(255,255,255,.2);border-radius:99px;overflow:hidden;flex:none}
+.toggle button{background:none;border:none;color:var(--dim);font:inherit;font-size:12px;
+  font-weight:600;padding:5px 13px;cursor:pointer}
+.toggle button[aria-pressed=true]{background:var(--chalk);color:var(--mat2)}
+
+/* ---------- handoff ---------- */
+.handoff{text-align:center;padding:52px 18px;border:1px dashed rgba(255,255,255,.22);
+  border-radius:var(--r);background:rgba(0,0,0,.2);margin-bottom:18px}
+.handoff .who{font-size:27px;font-weight:800;letter-spacing:-.02em;margin-bottom:5px}
+.handoff .sub{color:var(--dim);font-size:13.5px;margin-bottom:20px}
+
+/* ---------- flow + seats ---------- */
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;
+  color:var(--dim);margin-bottom:18px}
+.flow b{font-weight:600}
+.flow .arrow{opacity:.5}
+.seats{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:18px}
+.seat{border:1px solid rgba(255,255,255,.13);border-radius:var(--r);padding:10px 11px;
+  background:rgba(0,0,0,.16);transition:border-color .25s,background .25s}
+.seat.won{border-color:var(--chalk);background:rgba(255,255,255,.1)}
+.seat.acting{border-color:rgba(255,255,255,.45)}
+.seat .nm{display:flex;align-items:center;gap:7px;font-weight:700;font-size:13.5px}
+.seat .nm span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:2px;flex:none}
+.seat .pts{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--dim);font-weight:500}
+.seat .meta{font-size:11.5px;color:var(--dim);margin-top:2px}
+.seat .slotwrap{margin-top:9px;display:flex;justify-content:center;min-height:86px;align-items:center}
+
+/* ---------- cards ---------- */
+.card{width:60px;height:84px;border-radius:5px;background:var(--card);color:var(--ink);
+  position:relative;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:33px;line-height:1;flex:none;
+  box-shadow:0 2px 0 rgba(0,0,0,.28);border:1.5px solid}
+.card .band{position:absolute;top:3px;left:3px;right:3px;height:12px;border-radius:2px;
+  color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.card .cnr{position:absolute;bottom:4px;right:6px;font-size:11px;font-weight:700}
+.card.small{width:46px;height:65px;font-size:25px}
+.card.small .band{height:10px;font-size:7px}
+.card.back{background:repeating-linear-gradient(45deg,#33534F,#33534F 5px,#2B4643 5px,#2B4643 10px);
+  border-color:rgba(255,255,255,.22);
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.07),0 2px 0 rgba(0,0,0,.28)}
+.card.cancelled{opacity:.34}
+.card.cancelled::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(to bottom right,transparent 47%,var(--ink) 47%,var(--ink) 53%,transparent 53%)}
+.card.empty{background:none;border:1.5px dashed rgba(255,255,255,.16);box-shadow:none}
+
+/* ---------- centre / hand / log ---------- */
+.centre{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;
+  padding:20px 0;border-top:1px solid rgba(255,255,255,.1);
+  border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:18px}
+.prizecard{width:78px;height:108px;border-radius:6px;background:var(--card);
+  border:2px solid var(--prize);position:relative;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:var(--prize);box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.prizecard .band{position:absolute;top:4px;left:4px;right:4px;height:14px;background:var(--prize);
+  color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  border-radius:2px;letter-spacing:.05em}
+.prizecard .v{font-size:42px;font-weight:800;line-height:1;margin-top:8px}
+.prizecard .u{font-size:8.5px;font-weight:700;letter-spacing:.06em}
+.status{max-width:330px;min-height:52px}
+.status .big{font-size:16px;font-weight:700;margin-bottom:3px}
+.status .sm{font-size:13px;color:var(--dim)}
+.handzone h2{font-size:12.5px;font-weight:600;color:var(--dim);margin:0 0 9px}
+.hand{display:flex;gap:7px;flex-wrap:wrap;min-height:65px}
+.hand button{background:none;border:none;padding:0;cursor:pointer;border-radius:5px;transition:transform .14s}
+.hand button:hover:not(:disabled),.hand button:focus-visible{transform:translateY(-7px)}
+.hand button:disabled{cursor:default;opacity:.5}
+.final{display:flex;gap:20px;flex-wrap:wrap}
+.final .fn{font-weight:700;font-size:13.5px}
+.final .fs{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums}
+.log{margin-top:22px;border-top:1px solid rgba(255,255,255,.1);padding-top:14px}
+.log h2{font-size:12.5px;font-weight:600;color:var(--dim);margin:0 0 9px}
+.log ol{margin:0;padding:0;list-style:none;font-size:13px;max-height:210px;overflow:auto}
+.log li{padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07);color:var(--dim)}
+.log li b{font-weight:600}
+.log .rn{display:inline-block;min-width:26px;color:#6E807C;font-variant-numeric:tabular-nums}
+
+.btn{background:var(--chalk);color:var(--mat2);border:none;font:inherit;font-weight:700;
+  font-size:14px;padding:9px 18px;border-radius:99px;cursor:pointer}
+.btn.ghost{background:none;color:var(--chalk);border:1px solid rgba(255,255,255,.28)}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+
+/* ---------- balance ---------- */
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px}
+.ctrl label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px;font-weight:600}
+.ctrl .val{color:var(--chalk);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--chalk)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}
+.stat{border:1px solid rgba(255,255,255,.13);border-radius:var(--r);padding:12px 13px;background:rgba(0,0,0,.16)}
+.stat .n{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .l{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.35}
+.verdict{border-left:3px solid var(--chalk);padding:2px 0 2px 13px;margin:16px 0;font-size:14px}
+.verdict p{margin:0 0 7px}.verdict p:last-child{margin:0}
+.verdict .flag{color:#F0C070;font-weight:600}
+.verdict .ok{color:#8FCBA8;font-weight:600}
+.chart{margin-top:18px}
+.chart .r{display:flex;align-items:center;gap:9px;margin-bottom:4px;font-size:12px}
+.chart .k{width:62px;text-align:right;color:var(--dim);font-variant-numeric:tabular-nums;flex:none}
+.chart .b{height:13px;background:var(--chalk);border-radius:2px;min-width:1px;opacity:.85}
+.chart .c{color:var(--dim);font-variant-numeric:tabular-nums;font-size:11px}
+.hidden{display:none}
+.note{font-size:12.5px;color:var(--dim);margin-top:20px;max-width:62ch}
+@media (max-width:620px){.card{width:52px;height:73px;font-size:28px}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <h1>The Gift Economy</h1>
+    <span class="sub">playtest build</span>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tPlay" role="tab" aria-selected="true">Play</button>
+      <button class="tab" id="tBal" role="tab" aria-selected="false">Balance</button>
+    </div>
+  </div>
+
+  <!-- ======== LOBBY ======== -->
+  <section id="lobby" class="lobby">
+    <h2>Set up the table</h2>
+    <p class="lede">Name everyone playing and leave the rest as bots. One device gets
+      passed around, so each person only ever sees their own hand.</p>
+
+    <div class="count">
+      <button class="step" id="minus" aria-label="Fewer players">&minus;</button>
+      <span class="n" id="pCount">4</span>
+      <button class="step" id="plus" aria-label="More players">+</button>
+      <span class="lbl">players at the table</span>
+    </div>
+    <p class="hint" id="pHint"></p>
+
+    <div class="seatrows" id="seatRows"></div>
+
+    <div class="row">
+      <button class="btn" id="start">Start game</button>
+      <span style="color:var(--dim);font-size:12.5px" id="mixLbl"></span>
+    </div>
+  </section>
+
+  <!-- ======== GAME ======== -->
+  <section id="play" class="hidden">
+    <div class="flow" id="flow"></div>
+
+    <div id="handoff" class="handoff hidden">
+      <div class="who" id="hoWho"></div>
+      <div class="sub" id="hoSub"></div>
+      <button class="btn" id="hoGo">Show my hand</button>
+    </div>
+
+    <div id="tableArea">
+      <div class="seats" id="seats"></div>
+      <div class="centre">
+        <div id="prizeSlot"></div>
+        <div class="status">
+          <div class="big" id="sBig"></div>
+          <div class="sm" id="sSm"></div>
+        </div>
+      </div>
+      <div class="handzone">
+        <h2 id="handLbl">Your hand</h2>
+        <div class="hand" id="hand"></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:18px">
+      <button class="btn" id="next">Next round</button>
+      <button class="btn ghost" id="again">New table</button>
+    </div>
+
+    <div class="log">
+      <h2>Round log</h2>
+      <ol id="logList"></ol>
+    </div>
+  </section>
+
+  <!-- ======== BALANCE ======== -->
+  <section id="balance" class="hidden">
+    <p class="note" style="margin-top:0">
+      Runs whole games between bots and reports what the rules actually produced.
+      Change a number, run it again, and see which way the game moves.
+    </p>
+    <div class="ctrls">
+      <div class="ctrl"><label>Hand size <span class="val" id="vHand">7</span>
+        <span style="color:#6E807C">(cards 1&ndash;n)</span></label>
+        <input type="range" id="rHand" min="4" max="10" value="7"></div>
+      <div class="ctrl"><label>Prizes / rounds <span class="val" id="vRounds">9</span></label>
+        <input type="range" id="rRounds" min="5" max="14" value="9"></div>
+      <div class="ctrl"><label>Players <span class="val" id="vPlayers">4</span></label>
+        <input type="range" id="rPlayers" min="3" max="6" value="4"></div>
+      <div class="ctrl"><label>Games to run <span class="val" id="vGames">1000</span></label>
+        <input type="range" id="rGames" min="100" max="4000" step="100" value="1000"></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="run">Run simulation</button>
+      <button class="btn ghost" id="applyPlay">Use these settings at the table</button>
+    </div>
+    <div id="results" class="hidden">
+      <div class="stats" id="statGrid"></div>
+      <div class="verdict" id="verdict"></div>
+      <div class="chart" id="chart"></div>
+    </div>
+    <p class="note">
+      Bots bid roughly in proportion to how good the prize is against the prizes still
+      unseen, with three temperaments mixed in: one bids high, one shades down a step to
+      duck ties, one plays it straight. They are not great players. They are consistent
+      enough to tell you whether a rule change moved the game.
+    </p>
+  </section>
+</div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+
+/* ================= config ================= */
+const CFG={hand:7,rounds:9};
+const COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)','var(--p4)','var(--p5)'];
+const LETTERS=['A','B','C','D','E','F'];
+const MIN_P=3, MAX_P=6;
+
+let setup=[
+  {name:'Player 1',human:true,touched:false},
+  {name:'Bot B',human:false,touched:false},
+  {name:'Bot C',human:false,touched:false},
+  {name:'Bot D',human:false,touched:false}
+];
+
+/* ================= rules ================= */
+function makePrizes(n){
+  const a=[];for(let i=1;i<=n;i++)a.push(i);
+  for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+function resolve(plays){
+  const t={};plays.forEach(p=>t[p.v]=(t[p.v]||0)+1);
+  const live=plays.filter(p=>t[p.v]===1), cancelled=plays.filter(p=>t[p.v]>1);
+  if(!live.length) return {winner:null,cancelled,live};
+  return {winner:live.reduce((a,b)=>b.v>a.v?b:a),cancelled,live};
+}
+function botPick(hand,prize,remaining,temperament,bias){
+  const sorted=[...hand].sort((a,b)=>a-b);
+  const pool=[prize,...remaining], below=pool.filter(p=>p<prize).length;
+  let t=pool.length>1?below/(pool.length-1):0.5;
+  if(temperament===0)t=Math.min(1,t+0.16);
+  if(temperament===1)t=Math.max(0,t-0.10);
+  t+=(bias||0);
+  let idx=Math.round(t*(sorted.length-1));
+  idx+=[-2,-1,0,0,1,2][(Math.random()*6)|0];
+  if(t<0.34&&Math.random()<0.55)idx=0;
+  return sorted[Math.max(0,Math.min(sorted.length-1,idx))];
+}
+
+/* ================= simulation ================= */
+function simulate(cfg,games){
+  let winScore=0,lastScore=0,close=0,unclaimed=0,rounds=0,
+      cancelMattered=0,dumps=0,dumpChances=0,wins=new Array(cfg.players).fill(0);
+  const hist={};
+  for(let g=0;g<games;g++){
+    const hands=[],temps=[],bias=[],scores=new Array(cfg.players).fill(0);
+    for(let i=0;i<cfg.players;i++){
+      const h=[];for(let k=1;k<=cfg.hand;k++)h.push(k);
+      hands.push(h);temps.push((Math.random()*3)|0);bias.push((Math.random()-0.5)*0.30);
+    }
+    const deck=makePrizes(cfg.rounds);
+    for(let r=0;r<deck.length;r++){
+      const prize=deck[r],rest=deck.slice(r+1);
+      const plays=hands.map((h,i)=>({i,v:botPick(h,prize,rest,temps[i],bias[i])}));
+      const res=resolve(plays);rounds++;
+      plays.forEach(p=>{const lo=Math.min(...hands[p.i]);
+        if(Math.max(...hands[p.i])>lo){dumpChances++;if(p.v===lo)dumps++;}});
+      const raw=plays.reduce((a,b)=>b.v>a.v?b:a);
+      if(!res.winner)unclaimed++;else if(res.winner.i!==raw.i)cancelMattered++;
+      if(res.winner)scores[res.winner.i]+=prize;
+      plays.forEach(p=>hands[p.i].splice(hands[p.i].indexOf(p.v),1));
+      const gifts=plays.map(p=>p.v);
+      for(let i=0;i<cfg.players;i++)hands[(i+1)%cfg.players].push(gifts[i]);
+    }
+    const hi=Math.max(...scores),lo=Math.min(...scores);
+    winScore+=hi;lastScore+=lo;
+    if(hi-[...scores].sort((a,b)=>b-a)[1]<=1)close++;
+    wins[scores.indexOf(hi)]++;hist[hi]=(hist[hi]||0)+1;
+  }
+  return{games,rounds,avgWin:winScore/games,avgLast:lastScore/games,
+    gap:(winScore-lastScore)/games,closePct:100*close/games,
+    unclaimedPct:100*unclaimed/rounds,cancelPct:100*cancelMattered/rounds,
+    dumpPct:dumpChances?100*dumps/dumpChances:0,
+    seatBias:100*(Math.max(...wins)-Math.min(...wins))/games,hist};
+}
+
+/* ================= lobby ================= */
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function defaultName(i,human){
+  if(human) return 'Player '+(setup.slice(0,i).filter(s=>s.human).length+1);
+  return 'Bot '+LETTERS[i];
+}
+
+function renderLobby(){
+  $('pCount').textContent=setup.length;
+  $('minus').disabled=setup.length<=MIN_P;
+  $('plus').disabled=setup.length>=MAX_P;
+
+  const hint=$('pHint');
+  if(setup.length%2===0){
+    hint.className='hint';
+    hint.textContent='Even counts are the worst case for dead rounds. Bids split into matching '
+      +'pairs, everything cancels, and the prize gets binned — the simulator puts '
+      +setup.length+' players near 16% of rounds. Three or five runs cleaner.';
+  } else {
+    hint.className='hint quiet';
+    hint.textContent='Odd counts are harder to cancel out completely, so fewer prizes go to waste.';
+  }
+
+  $('seatRows').innerHTML=setup.map((s,i)=>`
+    <div class="seatrow">
+      <span class="tag" style="background:${COLORS[i]}">${LETTERS[i]}</span>
+      <input type="text" data-i="${i}" value="${esc(s.name)}" maxlength="18"
+             aria-label="Name for seat ${LETTERS[i]}">
+      <span class="toggle">
+        <button type="button" data-h="${i}" data-v="1" aria-pressed="${s.human}">Person</button>
+        <button type="button" data-h="${i}" data-v="0" aria-pressed="${!s.human}">Bot</button>
+      </span>
+    </div>`).join('');
+
+  const humans=setup.filter(s=>s.human).length;
+  $('mixLbl').textContent = humans===0
+    ? 'All bots — the game will play itself.'
+    : (()=>{ const bots=setup.length-humans;
+        const bStr = bots===0 ? 'no bots' : bots===1 ? '1 bot' : bots+' bots';
+        return humans===1
+          ? 'One person against '+bStr+'. Nothing to pass.'
+          : humans+' people sharing one device, '+bStr+'.';
+      })();
+}
+
+$('minus').onclick=()=>{ if(setup.length>MIN_P){setup.pop();renderLobby();} };
+$('plus').onclick=()=>{
+  if(setup.length<MAX_P){
+    setup.push({name:'Bot '+LETTERS[setup.length],human:false,touched:false});
+    renderLobby();
+  }
+};
+$('seatRows').addEventListener('input',e=>{
+  const inp=e.target.closest('input[data-i]');
+  if(inp){const i=+inp.dataset.i;setup[i].name=inp.value;setup[i].touched=true;}
+});
+$('seatRows').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-h]');
+  if(!b)return;
+  const i=+b.dataset.h, human=b.dataset.v==='1';
+  if(setup[i].human===human)return;
+  setup[i].human=human;
+  if(!setup[i].touched) setup[i].name=defaultName(i,human);
+  renderLobby();
+});
+$('start').onclick=()=>{
+  setup.forEach((s,i)=>{if(!s.name.trim())s.name=defaultName(i,s.human);});
+  newGame();
+  $('lobby').classList.add('hidden');
+  $('play').classList.remove('hidden');
+};
+$('again').onclick=()=>{
+  S=null;
+  $('play').classList.add('hidden');
+  $('lobby').classList.remove('hidden');
+  renderLobby();
+};
+
+/* ================= game ================= */
+let S=null;
+
+function newGame(){
+  S={seats:[],deck:makePrizes(CFG.rounds),round:0,prize:null,phase:'bid',log:[],active:-1};
+  setup.forEach((s,i)=>{
+    const h=[];for(let k=1;k<=CFG.hand;k++)h.push(k);
+    S.seats.push({name:s.name,human:s.human,letter:LETTERS[i],color:COLORS[i],
+      hand:h,score:0,played:null,cancelled:false,won:false,
+      temperament:(Math.random()*3)|0,bias:(Math.random()-0.5)*0.30});
+  });
+  S.prize=S.deck[0];
+  beginRound();
+}
+
+const humanSeats=()=>S.seats.map((s,i)=>s.human?i:-1).filter(i=>i>=0);
+
+function beginRound(){
+  S.seats.forEach(s=>{s.played=null;s.cancelled=false;s.won=false;});
+  const hs=humanSeats();
+  if(hs.length>1){S.phase='handoff';S.active=hs[0];render();}
+  else if(hs.length===1){S.phase='bid';S.active=hs[0];render();}
+  else {S.phase='bid';S.active=-1;botsAndReveal();}
+}
+
+function bid(idx){
+  if(S.phase!=='bid'||S.active<0)return;
+  const me=S.seats[S.active];
+  me.played=me.hand[idx];
+  const hs=humanSeats();
+  const nxt=hs[hs.indexOf(S.active)+1];
+  if(nxt!==undefined){S.phase='handoff';S.active=nxt;render();}
+  else {S.active=-1;render();setTimeout(botsAndReveal,380);}
+}
+
+function botsAndReveal(){
+  const rest=S.deck.slice(S.round+1);
+  S.seats.forEach(s=>{if(!s.human)s.played=botPick(s.hand,S.prize,rest,s.temperament,s.bias);});
+  reveal();
+}
+
+function reveal(){
+  S.phase='reveal';
+  const plays=S.seats.map((s,i)=>({i,v:s.played}));
+  const res=resolve(plays);
+  S.seats.forEach((s,i)=>{
+    s.cancelled=res.cancelled.some(c=>c.i===i);
+    s.won=!!res.winner&&res.winner.i===i;
+  });
+  if(res.winner)S.seats[res.winner.i].score+=S.prize;
+
+  const bits=S.seats.map(s=>`<b style="color:${s.color}">${s.played}</b>`).join(' ');
+  const uniq=[...new Set(res.cancelled.map(c=>c.v))];
+  let txt=`Prize <b style="color:var(--chalk)">${S.prize}</b> &middot; bids ${bits}`;
+  if(uniq.length)txt+=` &middot; ${uniq.join(' and ')} cancelled`;
+  txt += res.winner
+    ? ` &middot; <b style="color:${S.seats[res.winner.i].color}">${esc(S.seats[res.winner.i].name)}</b> takes it with ${res.winner.v}`
+    : ` &middot; nobody takes it`;
+  S.log.unshift({n:S.round+1,html:txt});
+  render();
+}
+
+function nextRound(){
+  const gifts=S.seats.map(s=>{s.hand.splice(s.hand.indexOf(s.played),1);return s.played;});
+  S.seats.forEach((s,i)=>{
+    const from=(i-1+S.seats.length)%S.seats.length;
+    s.hand.push(gifts[from]);s.hand.sort((a,b)=>a-b);
+  });
+  S.round++;
+  if(S.round<CFG.rounds){S.prize=S.deck[S.round];beginRound();}
+  else {S.phase='over';S.active=-1;render();}
+}
+
+function cardHTML(v,color,letter,cls){
+  return `<div class="card ${cls||''}" style="border-color:${color}">
+    <div class="band" style="background:${color}">${letter}</div>
+    ${v}<div class="cnr" style="color:${color}">${v}</div></div>`;
+}
+
+function render(){
+  const over=S.phase==='over', showHandoff=S.phase==='handoff';
+
+  $('flow').innerHTML='Cards pass this way: '+
+    S.seats.map(s=>`<b style="color:${s.color}">${esc(s.name)}</b>`)
+      .join(' <span class="arrow">&rarr;</span> ')+
+    ' <span class="arrow">&rarr;</span> back round';
+
+  $('logList').innerHTML=S.log.map(l=>`<li><span class="rn">${l.n}</span>${l.html}</li>`).join('');
+  $('handoff').classList.toggle('hidden',!showHandoff);
+  $('tableArea').classList.toggle('hidden',showHandoff);
+
+  if(showHandoff){
+    const who=S.seats[S.active];
+    $('hoWho').innerHTML=`Pass to <span style="color:${who.color}">${esc(who.name)}</span>`;
+    $('hoSub').textContent='Round '+(S.round+1)+' of '+CFG.rounds
+      +'. Nobody else should be looking at the screen.';
+    $('next').disabled=true;
+    $('next').textContent='Next round';
+    return;
+  }
+
+  $('seats').innerHTML=S.seats.map((s,i)=>{
+    let slot='<div class="card empty"></div>';
+    if(s.played!==null){
+      slot = S.phase==='bid'
+        ? '<div class="card back"></div>'
+        : cardHTML(s.played,s.color,s.letter,s.cancelled?'cancelled':'');
+    }
+    return `<div class="seat ${s.won?'won':''} ${S.active===i?'acting':''}">
+      <div class="nm"><span class="dot" style="background:${s.color}"></span>
+        <span class="t">${esc(s.name)}</span><span class="pts">${s.score}</span></div>
+      <div class="meta">${s.hand.length} cards${s.played!==null&&S.phase==='bid'?' &middot; bid locked':''}</div>
+      <div class="slotwrap">${slot}</div>
+    </div>`;
+  }).join('');
+
+  $('prizeSlot').innerHTML = over
+    ? `<div class="prizecard" style="border-color:rgba(255,255,255,.2);background:none;color:var(--dim)">
+       <div class="v" style="font-size:22px">&mdash;</div></div>`
+    : `<div class="prizecard"><div class="band">PRIZE</div>
+       <div class="v">${S.prize}</div><div class="u">POINTS</div></div>`;
+
+  const canBid = S.phase==='bid' && S.active>=0;
+  const me = S.active>=0 ? S.seats[S.active] : null;
+
+  if(over){
+    $('handLbl').textContent='Final scores';
+    $('hand').innerHTML='<div class="final">'+[...S.seats].sort((a,b)=>b.score-a.score)
+      .map(s=>`<div><div class="fn" style="color:${s.color}">${esc(s.name)}</div>
+        <div class="fs">${s.score}</div></div>`).join('')+'</div>';
+  } else if(!me){
+    $('handLbl').textContent='Hands are hidden';
+    $('hand').innerHTML='';
+  } else {
+    let skipped=false;
+    $('handLbl').textContent = canBid
+      ? esc(me.name)+' — click a card to bid'
+      : esc(me.name)+"'s "+me.played+' is on the table';
+    $('hand').innerHTML=me.hand.map((v,idx)=>{
+      if(!canBid&&me.played!==null&&v===me.played&&!skipped){skipped=true;return '';}
+      return `<button type="button" data-i="${idx}" ${canBid?'':'disabled'}
+        aria-label="Bid ${v}">${cardHTML(v,me.color,me.letter,'small')}</button>`;
+    }).join('');
+  }
+
+  if(over){
+    const best=[...S.seats].sort((a,b)=>b.score-a.score);
+    const tie=best.filter(s=>s.score===best[0].score);
+    $('sBig').textContent = tie.length>1
+      ? 'Tied at '+best[0].score+': '+tie.map(s=>s.name).join(' and ')
+      : best[0].name+' wins with '+best[0].score;
+    $('sSm').textContent=CFG.rounds+' prizes, all spent.';
+  } else {
+    $('sBig').textContent='Round '+(S.round+1)+' of '+CFG.rounds;
+    $('sSm').textContent = S.phase==='bid'
+      ? 'Everyone bids in secret. Matching numbers cancel.'
+      : 'Cards pass left. Press next round.';
+  }
+
+  $('next').disabled = S.phase!=='reveal';
+  $('next').textContent = over ? 'Game over' : 'Next round';
+}
+
+$('hoGo').onclick=()=>{S.phase='bid';render();};
+$('hand').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-i]');
+  if(b&&!b.disabled)bid(+b.dataset.i);
+});
+$('next').onclick=nextRound;
+
+/* ================= tabs ================= */
+function showTab(play){
+  $('tPlay').setAttribute('aria-selected',play);
+  $('tBal').setAttribute('aria-selected',!play);
+  $('balance').classList.toggle('hidden',play);
+  if(play){
+    const inGame = !!S;
+    $('lobby').classList.toggle('hidden',inGame);
+    $('play').classList.toggle('hidden',!inGame);
+  } else {$('lobby').classList.add('hidden');$('play').classList.add('hidden');}
+}
+$('tPlay').onclick=()=>showTab(true);
+$('tBal').onclick=()=>showTab(false);
+
+/* ================= balance wiring ================= */
+[['rHand','vHand'],['rRounds','vRounds'],['rPlayers','vPlayers'],['rGames','vGames']]
+ .forEach(([r,v])=>{const el=$(r);el.addEventListener('input',()=>$(v).textContent=el.value);});
+
+const readCfg=()=>({hand:+$('rHand').value,rounds:+$('rRounds').value,players:+$('rPlayers').value});
+
+$('applyPlay').onclick=()=>{
+  const c=readCfg();
+  CFG.hand=c.hand;CFG.rounds=c.rounds;
+  while(setup.length>c.players)setup.pop();
+  while(setup.length<c.players)
+    setup.push({name:'Bot '+LETTERS[setup.length],human:false,touched:false});
+  S=null;
+  showTab(true);renderLobby();
+  window.scrollTo({top:0,behavior:'smooth'});
+};
+
+$('run').onclick=()=>{
+  const cfg=readCfg(),games=+$('rGames').value,btn=$('run');
+  btn.disabled=true;btn.textContent='Running…';
+  setTimeout(()=>{paint(simulate(cfg,games),cfg);btn.disabled=false;btn.textContent='Run simulation';},20);
+};
+
+function paint(r,cfg){
+  $('results').classList.remove('hidden');
+  const stats=[
+    [r.avgWin.toFixed(1),'Average winning score'],
+    [r.avgLast.toFixed(1),'Average last-place score'],
+    [r.gap.toFixed(1),'Average gap, first to last'],
+    [r.closePct.toFixed(0)+'%','Games decided by a point or less'],
+    [r.cancelPct.toFixed(0)+'%','Rounds where cancelling changed who won'],
+    [r.dumpPct.toFixed(0)+'%','Bids that were a deliberate junk dump'],
+    [r.unclaimedPct.toFixed(0)+'%','Rounds where the prize went unclaimed'],
+    [r.seatBias.toFixed(1)+'%','Seat advantage, best seat over worst']
+  ];
+  $('statGrid').innerHTML=stats.map(([n,l])=>
+    `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+  const v=[];
+  v.push(r.cancelPct<8
+    ?`<p><span class="flag">Cancelling is barely firing (${r.cancelPct.toFixed(0)}%).</span> The rule costs you a sentence of teaching and gives little back. Shrink the hand so collisions get likelier.</p>`
+    :`<p><span class="ok">Cancelling is earning its place (${r.cancelPct.toFixed(0)}%).</span> It flips the winner often enough that bidding high stays a real risk.</p>`);
+  v.push(r.dumpPct<12
+    ?`<p><span class="flag">Almost nobody dumps junk (${r.dumpPct.toFixed(0)}%).</span> If players never spend a low card on purpose, the gift rule is just a tax on winners and the game has one fewer decision than you think.</p>`
+    :`<p><span class="ok">Junk dumping is live (${r.dumpPct.toFixed(0)}%).</span> Players lose rounds on purpose to poison a neighbour, which is the whole point.</p>`);
+  v.push(r.closePct>45
+    ?`<p><span class="flag">Too many photo finishes (${r.closePct.toFixed(0)}%).</span> Close is good, but this close this often means skill is being drowned out.</p>`
+    :r.closePct<12
+      ?`<p><span class="flag">Runaway leaders (${r.closePct.toFixed(0)}% close games).</span> Someone pulls clear early. Check whether the last rounds still matter.</p>`
+      :`<p><span class="ok">Finishes are healthy (${r.closePct.toFixed(0)}% within a point).</span></p>`);
+  if(r.unclaimedPct>12)v.push(`<p><span class="flag">Prizes are evaporating (${r.unclaimedPct.toFixed(0)}% of rounds).</span> When every bid cancels the prize is binned, so roughly ${(r.unclaimedPct/100*cfg.rounds).toFixed(1)} of your ${cfg.rounds} prizes never reach anyone. Even player counts are the worst case, because bids split into pairs easily. Either use an odd player count, or let a dead prize carry onto the next round so the pot builds.</p>`);
+  if(r.avgLast<r.avgWin*0.2)v.push(`<p><span class="flag">Last place is being shut out (${r.avgLast.toFixed(1)} against the winner's ${r.avgWin.toFixed(1)}).</span> Someone spends ten minutes taking nothing home.</p>`);
+  if(r.seatBias>6)v.push(`<p><span class="flag">Seat matters (${r.seatBias.toFixed(1)}% spread).</span> Since cards only ever flow one way, that is the passing direction showing up in the results.</p>`);
+  $('verdict').innerHTML=v.join('');
+
+  const keys=Object.keys(r.hist).map(Number).sort((a,b)=>a-b);
+  const max=Math.max(...keys.map(k=>r.hist[k]));
+  $('chart').innerHTML=`<h2 style="font-size:12.5px;font-weight:600;color:var(--dim);margin:0 0 9px">
+    Winning scores across ${r.games} games</h2>`+
+    keys.map(k=>`<div class="r"><span class="k">${k} pts</span>
+      <span class="b" style="width:${(r.hist[k]/max*72).toFixed(1)}%"></span>
+      <span class="c">${r.hist[k]}</span></div>`).join('');
+}
+
+renderLobby();
+</script>
