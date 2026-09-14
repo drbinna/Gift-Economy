@@ -1,6 +1,6 @@
 # The Gift Economy
 
-A simultaneous bidding card game for 3–6 players, about ten minutes.
+A simultaneous bidding card game for 3–20 players, about ten minutes at the small end.
 
 Every round you bid for a prize by playing a number card. The catch is that the card
 you play is not discarded — it goes to the player on your left and joins their hand.
@@ -12,6 +12,7 @@ This repo holds a playable digital build and a printable paper prototype.
 
 Each player takes a set of cards numbered 1–7. That is their hand for the whole game.
 Nine Prize cards, worth 1 through 9 points, are shuffled face down in the middle.
+(The digital build scales both numbers up for larger tables — see Player count below.)
 
 Each round:
 
@@ -53,6 +54,22 @@ It has two modes:
 
 Pages 1–3 cover a four-player game. Page 4 holds the Prize cards and a fifth hand.
 Cut along the card borders and deal one colour per player.
+
+## Player count
+
+Built for 3–6. The digital build goes to 20, but two things degrade as the table grows
+and the deck auto-scales to compensate:
+
+- **Cancelling collapses.** Bids land in only `hand` distinct values, so 20 players bidding
+  into cards 1–7 duplicate everything and 26% of rounds end with the prize binned. Hands
+  therefore scale to one card per player, which drops that to roughly zero.
+- **Shutouts.** Only one player scores per round, so with R rounds at most R people can score
+  anything. Twenty players over nine rounds leaves ~71% of the table on zero. Rounds scale
+  to 1.2× the player count, which helps but never fixes it.
+
+Above ten players most of the table are spectators, and the pass-the-device flow means
+20 people × 24 rounds = 480 handoffs. The build says so in the setup screen rather than
+pretending otherwise.
 
 ## Design notes
 

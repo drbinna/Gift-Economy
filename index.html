@@ -51,7 +51,27 @@ body{
 .hint{font-size:12.5px;color:#F0C070;margin:0 0 20px;max-width:64ch;min-height:18px}
 .hint.quiet{color:var(--dim)}
 
-.seatrows{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+.seatrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:8px;margin-bottom:22px}
+.quick{display:flex;gap:5px;margin-left:6px}
+.quick button{background:none;border:1px solid rgba(255,255,255,.18);color:var(--dim);
+  font:inherit;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;cursor:pointer}
+.quick button[aria-pressed=true]{background:var(--chalk);color:var(--mat2);border-color:var(--chalk)}
+.deck{font-size:12.5px;color:var(--dim);margin:0 0 6px}
+.deck.manual{color:var(--chalk)}
+.bulk{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.mini{background:none;border:1px solid rgba(255,255,255,.18);color:var(--dim);font:inherit;
+  font-size:12px;font-weight:600;padding:4px 11px;border-radius:99px;cursor:pointer}
+.mini:hover{color:var(--chalk);border-color:rgba(255,255,255,.35)}
+/* big tables: shrink the seats so they still fit on one screen */
+.seats.tight{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:7px}
+.seats.tight .seat{padding:7px 8px}
+.seats.tight .nm{font-size:12px}
+.seats.tight .meta{display:none}
+.seats.tight .slotwrap{min-height:62px;margin-top:6px}
+.seats.tight .card{width:42px;height:59px;font-size:22px;border-width:1.2px}
+.seats.tight .card .band{height:9px;font-size:6px;top:2px;left:2px;right:2px}
+.seats.tight .card .cnr{display:none}
 .seatrow{display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.13);
   border-radius:var(--r);padding:9px 11px;background:rgba(0,0,0,.16);flex-wrap:wrap}
 .seatrow .tag{width:26px;height:26px;border-radius:4px;display:flex;align-items:center;
@@ -193,6 +213,11 @@ input[type=range]{width:100%;accent-color:var(--chalk)}
 .note{font-size:12.5px;color:var(--dim);margin-top:20px;max-width:62ch}
 @media (max-width:620px){.card{width:52px;height:73px;font-size:28px}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* .hidden is declared near the top, so any later rule that sets its own display
+   (.welcome is flex, .seats is grid) out-ranks it at equal specificity and the
+   element stays on screen. Declaring it last, and loudly, closes that hole. */
+.hidden{display:none!important}
 </style>
 
 <div class="wrap">
@@ -245,8 +270,14 @@ input[type=range]{width:100%;accent-color:var(--chalk)}
       <span class="n" id="pCount">4</span>
       <button class="step" id="plus" aria-label="More players">+</button>
       <span class="lbl">players at the table</span>
+      <span class="quick" id="quick"></span>
     </div>
+    <p class="deck" id="deckNote"></p>
     <p class="hint" id="pHint"></p>
+    <div class="bulk">
+      <button type="button" class="mini" data-bulk="people">Everyone is a person</button>
+      <button type="button" class="mini" data-bulk="bots">Everyone but seat A is a bot</button>
+    </div>
 
     <div class="seatrows" id="seatRows"></div>
 
@@ -301,11 +332,11 @@ input[type=range]{width:100%;accent-color:var(--chalk)}
     <div class="ctrls">
       <div class="ctrl"><label>Hand size <span class="val" id="vHand">7</span>
         <span style="color:#6E807C">(cards 1&ndash;n)</span></label>
-        <input type="range" id="rHand" min="4" max="10" value="7"></div>
+        <input type="range" id="rHand" min="4" max="24" value="7"></div>
       <div class="ctrl"><label>Prizes / rounds <span class="val" id="vRounds">9</span></label>
-        <input type="range" id="rRounds" min="5" max="14" value="9"></div>
+        <input type="range" id="rRounds" min="5" max="30" value="9"></div>
       <div class="ctrl"><label>Players <span class="val" id="vPlayers">4</span></label>
-        <input type="range" id="rPlayers" min="3" max="6" value="4"></div>
+        <input type="range" id="rPlayers" min="3" max="20" value="4"></div>
       <div class="ctrl"><label>Games to run <span class="val" id="vGames">1000</span></label>
         <input type="range" id="rGames" min="100" max="4000" step="100" value="1000"></div>
     </div>
@@ -435,9 +466,29 @@ $('sndBtn').onclick=()=>{ Sound.toggle(); paintSnd(); };
 
 /* ================= config ================= */
 const CFG={hand:7,rounds:9};
-const COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)','var(--p4)','var(--p5)'];
-const LETTERS=['A','B','C','D','E','F'];
-const MIN_P=3, MAX_P=6;
+const COLORS=['#3A8DD6','#D14A33','#D9A02B','#9B5FC0','#4FB3A6','#C2608F',
+  '#7FB236','#E07A2F','#5B7FD4','#C94F6D','#3FA9C9','#A8894C','#8E7BD6','#64B36B',
+  '#D4626A','#B0A93F','#6FA3E0','#CE7BC4','#E0B04A','#79C4B0'];
+const LETTERS='ABCDEFGHIJKLMNOPQRST'.split('');
+const MIN_P=3, MAX_P=20;
+
+/* Two things break as the table grows, so the deck scales with it.
+
+   1. Cancelling. Bids land in only `hand` distinct values. Put 20 players into
+      cards 1-7 and the pigeonhole principle takes over: every value gets
+      duplicated and 26% of rounds end with the prize binned. Giving each player
+      as many cards as there are players drops that to nearly zero.
+
+   2. Shutouts. Only one player scores per round, so with R rounds at most R
+      people can score anything at all. Twenty players over nine rounds leaves
+      about 71% of the table on zero. More rounds is the only lever, and it
+      never fully fixes it. */
+let deckManual=false;   // true once the Balance tab has set the deck by hand
+function autoTune(players){
+  if(deckManual) return;
+  CFG.hand   = Math.max(7, players);
+  CFG.rounds = Math.max(9, Math.min(24, Math.round(players*1.2)));
+}
 
 let setup=[
   {name:'Player 1',human:true,touched:false},
@@ -521,12 +572,34 @@ function renderLobby(){
   $('minus').disabled=setup.length<=MIN_P;
   $('plus').disabled=setup.length>=MAX_P;
 
+  autoTune(setup.length);
+  const n=setup.length;
+  $('deckNote').className = deckManual ? 'deck manual' : 'deck';
+
+  $('quick').innerHTML=[3,4,6,10,20].map(v=>
+    `<button type="button" data-q="${v}" aria-pressed="${n===v}">${v}</button>`).join('');
+
+  $('deckNote').textContent='Each hand holds cards 1 to '+CFG.hand+', and '+CFG.rounds
+    +' prizes come out. '+(deckManual?'Set by hand in the Balance tab.':'Both scale with the table.');
+
+  // at most `rounds` people can score, since only one player wins each round
+  const canScore=Math.min(n,CFG.rounds);
+  const shutout=Math.round(100*(n-canScore*0.62)/n);   // 0.62 = winners repeat
+
   const hint=$('pHint');
-  if(setup.length%2===0){
+  if(n>10){
+    hint.className='hint';
+    hint.textContent='This is well past what the game was built for. Only one player scores '
+      +'per round, so with '+CFG.rounds+' prizes between '+n+' people roughly '+Math.max(0,shutout)
+      +'% go home with nothing. It still runs, but expect most of the table to be spectators.';
+  } else if(n>6){
+    hint.className='hint';
+    hint.textContent='Above six the table thins out: with '+CFG.rounds+' prizes between '+n
+      +' people, a good share score nothing at all. Playable, but three to six is the sweet spot.';
+  } else if(n%2===0){
     hint.className='hint';
     hint.textContent='Even counts are the worst case for dead rounds. Bids split into matching '
-      +'pairs, everything cancels, and the prize gets binned — the simulator puts '
-      +setup.length+' players near 16% of rounds. Three or five runs cleaner.';
+      +'pairs, everything cancels, and the prize gets binned. Three or five runs cleaner.';
   } else {
     hint.className='hint quiet';
     hint.textContent='Odd counts are harder to cancel out completely, so fewer prizes go to waste.';
@@ -548,14 +621,37 @@ function renderLobby(){
     ? 'All bots — the game will play itself.'
     : (()=>{ const bots=setup.length-humans;
         const bStr = bots===0 ? 'no bots' : bots===1 ? '1 bot' : bots+' bots';
-        return humans===1
-          ? 'One person against '+bStr+'. Nothing to pass.'
-          : humans+' people sharing one device, '+bStr+'.';
+        if(humans===1) return 'One person against '+bStr+'. Nothing to pass.';
+        const passes=humans*CFG.rounds;
+        return humans+' people sharing one device, '+bStr+'.'
+          + (humans>6 ? '  That is '+passes+' handoffs over the game \u2014 workable on paper, '
+              +'slow in a room. Consider making most seats bots.' : '');
       })();
 }
 
-$('minus').onclick=()=>{ if(setup.length>MIN_P){setup.pop();renderLobby();} };
+function setCount(target){
+  deckManual=false;
+  target=Math.max(MIN_P,Math.min(MAX_P,target));
+  while(setup.length>target) setup.pop();
+  while(setup.length<target)
+    setup.push({name:'Bot '+LETTERS[setup.length],human:false,touched:false});
+  renderLobby();
+}
+$('quick').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-q]'); if(b) setCount(+b.dataset.q);
+});
+document.querySelector('.bulk').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-bulk]'); if(!b) return;
+  const all=b.dataset.bulk==='people';
+  setup.forEach((s,i)=>{
+    s.human = all || i===0;
+    if(!s.touched) s.name = s.human ? 'Player '+(i+1) : 'Bot '+LETTERS[i];
+  });
+  renderLobby();
+});
+$('minus').onclick=()=>{ if(setup.length>MIN_P){deckManual=false;setup.pop();renderLobby();} };
 $('plus').onclick=()=>{
+  deckManual=false;
   if(setup.length<MAX_P){
     setup.push({name:'Bot '+LETTERS[setup.length],human:false,touched:false});
     renderLobby();
@@ -679,10 +775,15 @@ function cardHTML(v,color,letter,cls){
 function render(){
   const over=S.phase==='over', showHandoff=S.phase==='handoff';
 
-  $('flow').innerHTML='Cards pass this way: '+
-    S.seats.map(s=>`<b style="color:${s.color}">${esc(s.name)}</b>`)
-      .join(' <span class="arrow">&rarr;</span> ')+
-    ' <span class="arrow">&rarr;</span> back round';
+  // a 20-name chain is unreadable, so long tables get the ends and a count
+  const chain=(arr)=>arr.map(s=>`<b style="color:${s.color}">${esc(s.name)}</b>`)
+    .join(' <span class="arrow">&rarr;</span> ');
+  $('flow').innerHTML = S.seats.length<=6
+    ? 'Cards pass this way: '+chain(S.seats)+' <span class="arrow">&rarr;</span> back round'
+    : 'Cards pass this way: '+chain(S.seats.slice(0,3))
+      +` <span class="arrow">&rarr;</span> <span class="arrow">&hellip;${S.seats.length-4} more&hellip;</span> `
+      +`<span class="arrow">&rarr;</span> `+chain(S.seats.slice(-1))
+      +' <span class="arrow">&rarr;</span> back round';
 
   $('logList').innerHTML=S.log.map(l=>`<li><span class="rn">${l.n}</span>${l.html}</li>`).join('');
   $('handoff').classList.toggle('hidden',!showHandoff);
@@ -698,6 +799,7 @@ function render(){
     return;
   }
 
+  $('seats').className='seats'+(S.seats.length>8?' tight':'');
   $('seats').innerHTML=S.seats.map((s,i)=>{
     let slot='<div class="card empty"></div>';
     if(s.played!==null){
@@ -790,6 +892,7 @@ const readCfg=()=>({hand:+$('rHand').value,rounds:+$('rRounds').value,players:+$
 
 $('applyPlay').onclick=()=>{
   const c=readCfg();
+  deckManual=true;
   CFG.hand=c.hand;CFG.rounds=c.rounds;
   while(setup.length>c.players)setup.pop();
   while(setup.length<c.players)
